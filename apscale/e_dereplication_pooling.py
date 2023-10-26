@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 from joblib import Parallel, delayed
 
+
 ## dereplication function to dereplicate a gzipped fasta file
 def dereplication(file, project=None, comp_lvl=None, min_size=None):
     """Function to dereplicate a gzipped fasta file. Abundance annotations will be
@@ -206,6 +207,8 @@ def pooling(file_list, project=None, comp_lvl=None, min_size=None):
                 "--sizeout",
                 "--minuniquesize",
                 str(2),
+                "--relabel",
+                "seq:",
             ],
             stdout=output,
         )
