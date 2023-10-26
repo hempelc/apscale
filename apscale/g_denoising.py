@@ -8,56 +8,125 @@ from io import StringIO
 from tqdm import tqdm
 from openpyxl.utils.dataframe import dataframe_to_rows
 
+
 ## denoising function to denoise all sequences the input fasta with a given alpha and minsize
-def denoise(project=None, comp_lvl=None, cores=None, alpha=None, minsize=None):
+def denoise(
+    project=None, comp_lvl=None, cores=None, alpha=None, minsize=None, coi=None
+):
     """Function to apply denoisind to a given gzipped file. Outputs a fasta file with all
     centroid sequences."""
 
     ## define the name for the output fasta
     ## create an output path to write to
     sample_name_out_1 = "ESVs_with_chimeras.fasta.gz"
-    output_path = Path(project).joinpath("8_denoising", "data", sample_name_out_1)
-
-    ## give user output
-    print(
-        "{}: Starting denoising. This may take a while.".format(
-            datetime.datetime.now().strftime("%H:%M:%S")
-        )
+    gz_fasta = Path(project).joinpath(
+        "6_dereplication_pooling",
+        "data",
+        "pooling",
+        "pooled_sequences_dereplicated.fasta.gz",
     )
+    fasta = os.path.splitext(gz_fasta)[0]
+    fasta_edited = f"{os.path.splitext(fasta)[0]}_seqidedit.fasta"
+    output_path = Path(project).joinpath("8_denoising", "data", sample_name_out_1)
+    temp_path = Path(project).joinpath("8_denoising", "temp")
 
-    ## run vsearch --cluster_unoise to cluster OTUs
-    ## use --log because for some reason no info is written to stderr with this command
-    ## write stdout to uncompressed output at runtime
-    with open(output_path.with_suffix(""), "w") as output:
-        f = subprocess.run(
-            [
-                "vsearch",
-                "--cluster_unoise",
-                Path(project).joinpath(
-                    "6_dereplication_pooling",
-                    "data",
-                    "pooling",
-                    "pooled_sequences_dereplicated.fasta.gz",
-                ),
-                "--unoise_alpha",
-                str(alpha),
-                "--minsize",
-                str(minsize),
-                "--sizein",
-                "--sizeout",
-                "--centroids",
-                "-",
-                "--fasta_width",
-                str(0),
-                "--quiet",
-                "--log",
-                Path(project).joinpath("8_denoising", "temp", "denoising_log.txt"),
-                "--threads",
-                str(cores),
-            ],
-            stdout=output,
-            stderr=subprocess.DEVNULL,
+    # Open the gzip-compressed file and the output file
+    with gzip.open(gz_fasta, "rb") as gz_file, open(fasta, "wb") as output:
+        # Read the compressed data and write it to the output file
+        output.write(gz_file.read())
+
+    # collect number of processed reads
+    seqs = len([1 for line in open(fasta) if line.startswith(">")])
+
+    if coi == True:
+        ## give user output
+        print(
+            f'{datetime.datetime.now().strftime("%H:%M:%S")}: Starting denoising with DnoisE. This may take a while.'
         )
+
+        # Replace sequence IDs with ascending numbers to remove duplicate IDs (otherwise DnoisE fails)
+        sequence_number = 1
+        with open(fasta, "r") as infile, open(fasta_edited, "w") as outfile:
+            for line in infile:
+                if line.startswith(">seq:"):
+                    # Extract the size information
+                    size_info = line.split(";")[1]
+                    # Replace the sequence number in the ID and keep the size information
+                    line = f">seq:{sequence_number};{size_info}"
+                    # Increment the sequence number
+                    sequence_number += 1
+                outfile.write(line)
+
+        # run DnoisE to denoise reads, remove unused denoising info, and rename DnoisE fasta
+        # min_abun is set to 8 (minimum read abundance) to match the default unoise setting
+        with open(temp_path.joinpath("dnoise_log.txt"), "w") as output:
+            f = subprocess.run(
+                [
+                    "dnoise",
+                    "--fasta_input",
+                    fasta_edited,
+                    "--fasta_output",
+                    output_path.with_suffix(""),
+                    "--min_abun",
+                    str(8),
+                    "-y",
+                    "--cores",
+                    str(cores),
+                ],
+                stdout=output,
+            )
+        os.remove(f'{output_path.with_suffix("")}_Adcorr_denoising_info.csv')
+        os.rename(
+            f'{output_path.with_suffix("")}_Adcorr_denoised_ratio_d.fasta',
+            output_path.with_suffix(""),
+        )
+
+        # Remove uncompressed fasta file
+        os.remove(fasta_edited)
+
+    elif coi == False:
+        ## give user output
+        print(
+            f'{datetime.datetime.now().strftime("%H:%M:%S")}: Starting denoising with vsearch unoise. This may take a while.'
+        )
+
+        with open(output_path.with_suffix(""), "w") as output:
+            f = subprocess.run(
+                [
+                    "vsearch",
+                    "--cluster_unoise",
+                    fasta,
+                    "--unoise_alpha",
+                    str(alpha),
+                    "--minsize",
+                    str(minsize),
+                    "--sizein",
+                    "--sizeout",
+                    "--centroids",
+                    "-",
+                    "--fasta_width",
+                    str(0),
+                    "--quiet",
+                    "--log",
+                    temp_path.joinpath("denoising_log.txt"),
+                    "--threads",
+                    str(cores),
+                ],
+                stdout=output,
+                stderr=subprocess.DEVNULL,
+            )
+
+    else:
+        print(
+            f'"coi" must be set to either True or False, current setting: {coi}',
+            file=sys.stderr,
+        )
+        sys.exit()
+
+    # Collect number of ESVs
+    esvs = len(
+        [1 for line in open(output_path.with_suffix("")) if line.startswith(">")]
+    )
 
     ## compress the output, remove uncompressed output
     with open(output_path.with_suffix(""), "rb") as in_stream, gzip.open(
@@ -66,28 +135,18 @@ def denoise(project=None, comp_lvl=None, cores=None, alpha=None, minsize=None):
         shutil.copyfileobj(in_stream, out_stream)
     os.remove(output_path.with_suffix(""))
 
-    ## collect processed and passed reads from the log file
-    with open(
-        Path(project).joinpath("8_denoising", "temp", "denoising_log.txt")
-    ) as log_file:
-        content = log_file.read()
-        seqs, esvs = (
-            re.findall("(\d+) seqs, min ", content)[0],
-            re.findall("Clusters: (\d+) Size min", content)[0],
-        )
-
     print(
         "{}: Denoised unique {} sequences into {} ESVs.".format(
             datetime.datetime.now().strftime("%H:%M:%S"), seqs, esvs
         )
     )
     print(
-        "{}: Starting chimera removal from the OTUs. This may take a while.".format(
+        "{}: Starting chimera removal from the ESVs. This may take a while.".format(
             datetime.datetime.now().strftime("%H:%M:%S")
         )
     )
 
-    ## run vsearch --uchime_denovo to remove chimeric sequences from the OTUs
+    ## run vsearch --uchime_denovo to remove chimeric sequences from the ESVs
     f = subprocess.run(
         [
             "vsearch",
@@ -249,15 +308,21 @@ def main(project=Path.cwd()):
     settings = pd.read_excel(
         Path(project).joinpath("Settings.xlsx"), sheet_name="8_denoising"
     )
-    alpha, minsize, to_excel = (
+    alpha, minsize, coi, to_excel = (
         settings["alpha"].item(),
         settings["minsize"].item(),
+        settings["coi"].item(),
         settings["to excel"].item(),
     )
 
     ## denoise the dataset
     denoise(
-        project=project, comp_lvl=comp_lvl, cores=cores, alpha=alpha, minsize=minsize
+        project=project,
+        comp_lvl=comp_lvl,
+        cores=cores,
+        alpha=alpha,
+        minsize=minsize,
+        coi=coi,
     )
 
     ## gather files for remapping of ESVs
