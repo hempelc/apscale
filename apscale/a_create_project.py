@@ -78,12 +78,24 @@ def create_project(project_name):
         df_6.to_excel(writer, sheet_name="6_dereplication_pooling", index=False)
 
         ## write the 7_otu_clustering sheet
-        df_7 = pd.DataFrame([[97, "True"]], columns=["pct id", "to excel"])
+        df_7 = pd.DataFrame(
+            [["vsearch", 97, 1, "False", "False", "True"]],
+            columns=[
+                "clustering tool",
+                "vsearch pct id",
+                "swarm distance",
+                "prior denoise",
+                "coi",
+                "to excel",
+            ],
+        )
 
         df_7.to_excel(writer, sheet_name="7_otu_clustering", index=False)
 
         ## write the 8_denoising sheet
-        df_8 = pd.DataFrame([[2, 8, "True"]], columns=["alpha", "minsize", "to excel"])
+        df_8 = pd.DataFrame(
+            [[2, 8, "False", "True"]], columns=["alpha", "minsize", "coi", "to excel"]
+        )
 
         df_8.to_excel(writer, sheet_name="8_denoising", index=False)
 
