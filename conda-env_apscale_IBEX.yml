@@ -236,6 +236,3 @@ dependencies:
   - zlib=1.2.13
   - zstandard=0.19.0
   - zstd=1.5.5
-  - pip:
-      - apscale==1.6.3
-prefix: /home/chempel/programs/miniforge3/envs/apscale
