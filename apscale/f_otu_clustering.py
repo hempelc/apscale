@@ -119,9 +119,6 @@ def otu_clustering(project=None, comp_lvl=None, cores=None, pct_id=None, coi=Non
     )
 
     if clusteringtool=="swarm":
-        if coi:
-            # d=13 is optimal for COI Leray primers according to note in MJOLNIR pipeline
-            d=13
 
         f = subprocess.run(
             [
