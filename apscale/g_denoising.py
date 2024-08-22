@@ -68,7 +68,7 @@ def denoise(
                     "--fasta_output",
                     output_path.with_suffix(""),
                     "--min_abun",
-                    str(8),
+                    str(minsize),
                     "-y",
                     "--cores",
                     str(cores),
