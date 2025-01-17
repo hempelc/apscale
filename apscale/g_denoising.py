@@ -308,7 +308,7 @@ def main(project=Path.cwd()):
     settings = pd.read_excel(
         Path(project).joinpath("Settings.xlsx"), sheet_name="8_denoising"
     )
-    alpha, minsize_denoising, coi, to_excel = (
+    alpha, minsize, coi, to_excel = (
         settings["alpha"].item(),
         settings["minsize_denoising"].item(),
         settings["coi"].item(),
@@ -321,7 +321,7 @@ def main(project=Path.cwd()):
         comp_lvl=comp_lvl,
         cores=cores,
         alpha=alpha,
-        minsize=minsize_denoising,
+        minsize=minsize,
         coi=coi,
     )
 
