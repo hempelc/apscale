@@ -4,6 +4,7 @@ from pathlib import Path
 from demultiplexer import file_pairs
 from joblib import Parallel, delayed
 
+
 ## file pair: matching forward and reverse reads, project: folder to write to
 def pe_merge(
     file_pair,
@@ -48,6 +49,8 @@ def pe_merge(
                 "--fastq_allowmergestagger",
                 "--threads",
                 str(1),
+                "--fastq_qmax",
+                str(55),
             ],
             stdout=output,
             stderr=log,
