@@ -5,7 +5,7 @@ from joblib import Parallel, delayed
 
 
 ## dereplication function to dereplicate a gzipped fasta file
-def dereplication(file, project=None, comp_lvl=None, min_size=None):
+def dereplication(file, project=None, comp_lvl=None, minsize=None):
     """Function to dereplicate a gzipped fasta file. Abundance annotations will be
     written to the output fasta."""
 
@@ -51,9 +51,9 @@ def dereplication(file, project=None, comp_lvl=None, min_size=None):
         shutil.copyfileobj(in_stream, out_stream)
     os.remove(output_path.with_suffix(""))
 
-    ## generate a new output path to stream min_size dereplicated sequences that are used for pooling and clustering
-    ## do so only if min_size if bigger than 1, else use dereplicated files from step before
-    if min_size > 1:
+    ## generate a new output path to stream minsize dereplicated sequences that are used for pooling and clustering
+    ## do so only if minsize if bigger than 1, else use dereplicated files from step before
+    if minsize > 1:
         output_path = Path(project).joinpath(
             "6_dereplication_pooling", "data", "pooling", sample_name_out
         )
@@ -79,7 +79,7 @@ def dereplication(file, project=None, comp_lvl=None, min_size=None):
                     "--relabel",
                     "seq:",
                     "--minuniquesize",
-                    str(min_size),
+                    str(minsize),
                 ],
                 stdout=output,
             )
@@ -119,13 +119,13 @@ def dereplication(file, project=None, comp_lvl=None, min_size=None):
 
 
 ## function to pool the dereplicated reads, pooled reads are dereplicated again
-def pooling(file_list, project=None, comp_lvl=None, min_size=None):
+def pooling(file_list, project=None, comp_lvl=None, minsize=None):
     """Function to pool the dereplicated reads, needs a path to dereplicated reads folder
     and a project to work in. Both are passed by the main function."""
 
-    ## write the output file, depending on the value of min_size, delete files that are only used for pooling
+    ## write the output file, depending on the value of minsize, delete files that are only used for pooling
     ## and no longer needed for mapping
-    if min_size > 1:
+    if minsize > 1:
         with gzip.open(
             Path(project).joinpath(
                 "6_dereplication_pooling",
@@ -206,7 +206,7 @@ def pooling(file_list, project=None, comp_lvl=None, min_size=None):
                 "--sizein",
                 "--sizeout",
                 "--minuniquesize",
-                str(2),
+                str(minsize),
                 "--relabel",
                 "seq:",
             ],
@@ -239,7 +239,7 @@ def main(project=Path.cwd()):
     settings = pd.read_excel(
         Path(project).joinpath("Settings.xlsx"), sheet_name="6_dereplication_pooling"
     )
-    min_size = settings["min size to pool"].item()
+    minsize = settings["minsize_derep_pooling"].item()
 
     ## collect input files from quality filtering step
     input = glob.glob(
@@ -261,7 +261,7 @@ def main(project=Path.cwd()):
     ## parallelize the dereplication
     Parallel(n_jobs=cores)(
         delayed(dereplication)(
-            file, project=project, comp_lvl=comp_lvl, min_size=min_size
+            file, project=project, comp_lvl=comp_lvl, minsize=minsize
         )
         for file in input
     )
@@ -301,7 +301,7 @@ def main(project=Path.cwd()):
         log_df.to_excel(writer, sheet_name="6_dereplication", index=False)
 
     ## pool the dereplicated files, if minsize is set to a value > 1 use those for files for pooling
-    if min_size > 1:
+    if minsize > 1:
         files = glob.glob(
             str(
                 Path(project).joinpath(
@@ -318,7 +318,7 @@ def main(project=Path.cwd()):
             )
         )
 
-    pooling(files, project=project, comp_lvl=comp_lvl, min_size=min_size)
+    pooling(files, project=project, comp_lvl=comp_lvl, minsize=minsize)
 
     ## remove temporary files
     shutil.rmtree(Path(project).joinpath("6_dereplication_pooling", "temp"))
