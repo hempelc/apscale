@@ -7,33 +7,47 @@ from io import StringIO
 from tqdm import tqdm
 from openpyxl.utils.dataframe import dataframe_to_rows
 
+
 ## clustering function to cluster all sequences in input fasta with given pct_id
-def otu_clustering(project=None, comp_lvl=None, cores=None, pct_id=None, coi=None, d=None, denoise_prior=None, clusteringtool=None, alpha=None, minsize=None):
+def otu_clustering(
+    project=None,
+    comp_lvl=None,
+    cores=None,
+    pct_id=None,
+    coi=None,
+    d=None,
+    denoise_prior=None,
+    clusteringtool=None,
+    alpha=None,
+    minsize=None,
+):
     """Function to apply OTU clustering to a given gzipped file. Outputs a fasta file
     with all centroid sequences."""
 
     ## define the name for the output fasta and input gz fasta
     ## create an output path to write to
     sample_name_out_1 = "OTUs_with_chimeras.fasta.gz"
-    gz_fasta = Path(project).joinpath("6_dereplication_pooling",
-            "data",
-            "pooling",
-            "pooled_sequences_dereplicated.fasta.gz")
+    gz_fasta = Path(project).joinpath(
+        "6_dereplication_pooling",
+        "data",
+        "pooling",
+        "pooled_sequences_dereplicated.fasta.gz",
+    )
     fasta = os.path.splitext(gz_fasta)[0]
     output_path = Path(project).joinpath("7_otu_clustering", "data", sample_name_out_1)
     temp_path = Path(project).joinpath("7_otu_clustering", "temp")
 
     # Open the gzip-compressed file and the output file
-    with gzip.open(gz_fasta, 'rb') as gz_file, open(fasta, 'wb') as output:
+    with gzip.open(gz_fasta, "rb") as gz_file, open(fasta, "wb") as output:
         # Read the compressed data and write it to the output file
         output.write(gz_file.read())
 
     # collect number of processed reads
     seqs = len([1 for line in open(fasta) if line.startswith(">")])
 
-    if denoise_prior==True:
+    if denoise_prior == True:
 
-        if coi==True:
+        if coi == True:
 
             ## give user output
             print(
@@ -60,18 +74,23 @@ def otu_clustering(project=None, comp_lvl=None, cores=None, pct_id=None, coi=Non
                 )
             dnoise_outfile = temp_path.joinpath("dnoise_outfile.fasta")
             os.remove(temp_path.joinpath("dnoise_Adcorr_denoising_info.csv"))
-            os.rename(temp_path.joinpath("dnoise_Adcorr_denoised_ratio_d.fasta"), dnoise_outfile)
+            os.rename(
+                temp_path.joinpath("dnoise_Adcorr_denoised_ratio_d.fasta"),
+                dnoise_outfile,
+            )
 
-            clusterinfile=dnoise_outfile
+            clusterinfile = dnoise_outfile
 
-        elif coi==False:
+        elif coi == False:
 
             ## give user output
             print(
                 f'{datetime.datetime.now().strftime("%H:%M:%S")}: Starting denoising with vsearch unoise. This may take a while.'
             )
 
-            with open(temp_path.joinpath("vsearch_unoise_outfile.fasta"), "w") as output:
+            with open(
+                temp_path.joinpath("vsearch_unoise_outfile.fasta"), "w"
+            ) as output:
                 f = subprocess.run(
                     [
                         "vsearch",
@@ -99,26 +118,31 @@ def otu_clustering(project=None, comp_lvl=None, cores=None, pct_id=None, coi=Non
                     stderr=subprocess.DEVNULL,
                 )
 
-            clusterinfile=temp_path.joinpath("vsearch_unoise_outfile.fasta")
+            clusterinfile = temp_path.joinpath("vsearch_unoise_outfile.fasta")
 
         else:
-            print(f'"coi" must be set to either True or False, current setting: {coi}', file=sys.stderr)
+            print(
+                f'"coi" must be set to either True or False, current setting: {coi}',
+                file=sys.stderr,
+            )
             sys.exit()
 
-    elif denoise_prior==False:
-        clusterinfile=fasta
- 
-    else:
-        print(f'"prior denoise" must be set to either True or False, current setting: {denoise_prior}', file=sys.stderr)
-        sys.exit()
+    elif denoise_prior == False:
+        clusterinfile = fasta
 
+    else:
+        print(
+            f'"prior denoise" must be set to either True or False, current setting: {denoise_prior}',
+            file=sys.stderr,
+        )
+        sys.exit()
 
     ## give user output
     print(
         f'{datetime.datetime.now().strftime("%H:%M:%S")}: Starting OTU clustering with {clusteringtool}. This may take a while.'
     )
 
-    if clusteringtool=="swarm":
+    if clusteringtool == "swarm":
 
         f = subprocess.run(
             [
@@ -137,7 +161,7 @@ def otu_clustering(project=None, comp_lvl=None, cores=None, pct_id=None, coi=Non
             capture_output=True,
         )
 
-    elif clusteringtool=="vsearch":
+    elif clusteringtool == "vsearch":
 
         ## run vsearch --cluster_size to cluster OTUs
         ## use --log because for some reason no info is written to stderr with this command
@@ -169,12 +193,17 @@ def otu_clustering(project=None, comp_lvl=None, cores=None, pct_id=None, coi=Non
                 stdout=output,
             )
 
-    else: 
-        print(f'"clusteringtool" must be set to either vsearch or swarm, current setting: {clusteringtool}', file=sys.stderr)
+    else:
+        print(
+            f'"clusteringtool" must be set to either vsearch or swarm, current setting: {clusteringtool}',
+            file=sys.stderr,
+        )
         sys.exit()
 
     # collect number of generated clusters
-    clusters = len([1 for line in open(output_path.with_suffix("")) if line.startswith(">")])
+    clusters = len(
+        [1 for line in open(output_path.with_suffix("")) if line.startswith(">")]
+    )
 
     ## compress the output, remove uncompressed output
     with open(output_path.with_suffix(""), "rb") as in_stream, gzip.open(
@@ -356,17 +385,37 @@ def main(project=Path.cwd()):
     cluster_settings = pd.read_excel(
         Path(project).joinpath("Settings.xlsx"), sheet_name="7_otu_clustering"
     )
-    clusteringtool, pct_id, d, denoise_prior, coi, to_excel = cluster_settings["clustering tool"].item(), cluster_settings["vsearch pct id"].item(), cluster_settings["swarm distance"].item(), cluster_settings["prior denoise"].item(), cluster_settings["coi"].item(), cluster_settings["to excel"].item()
+    clusteringtool, pct_id, d, denoise_prior, coi, to_excel = (
+        cluster_settings["clustering tool"].item(),
+        cluster_settings["vsearch pct id"].item(),
+        cluster_settings["swarm distance"].item(),
+        cluster_settings["prior denoise"].item(),
+        cluster_settings["coi"].item(),
+        cluster_settings["to excel"].item(),
+    )
 
     denoise_settings = pd.read_excel(
         Path(project).joinpath("Settings.xlsx"), sheet_name="8_denoising"
     )
 
-    alpha, minsize = denoise_settings["alpha"].item(), denoise_settings["minsize"].item()
+    alpha, minsize = (
+        denoise_settings["alpha"].item(),
+        denoise_settings["minsize_denoising"].item(),
+    )
 
     ## run OTU clustering function
-    otu_clustering(project=project, comp_lvl=comp_lvl, cores=cores, pct_id=pct_id, coi=coi, d=d,
-                   denoise_prior=denoise_prior, clusteringtool=clusteringtool, alpha=alpha, minsize=minsize)
+    otu_clustering(
+        project=project,
+        comp_lvl=comp_lvl,
+        cores=cores,
+        pct_id=pct_id,
+        coi=coi,
+        d=d,
+        denoise_prior=denoise_prior,
+        clusteringtool=clusteringtool,
+        alpha=alpha,
+        minsize=minsize,
+    )
 
     ## gather files for remapping of OTUS
     input = glob.glob(
