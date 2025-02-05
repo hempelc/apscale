@@ -308,6 +308,8 @@ def main(project=Path.cwd()):
     settings = pd.read_excel(
         Path(project).joinpath("Settings.xlsx"), sheet_name="8_denoising"
     )
+    print(f"XXXXXXX {settings}")
+    print(f"XXXXXXX {settings["minsize_denoising"].item()}")
     alpha, minsize, coi, to_excel = (
         settings["alpha"].item(),
         settings["minsize_denoising"].item(),
