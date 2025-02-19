@@ -54,6 +54,7 @@ def pe_merge(
             ],
             stdout=output,
             stderr=log,
+            check=True,
         )
 
     ## compress the output, remove uncompressed output
@@ -64,20 +65,16 @@ def pe_merge(
     os.remove(output_path.with_suffix(""))
 
     ## read run info from log file
-    with open(
-        Path(project).joinpath(
-            "3_PE_merging", "temp", "{}_log.txt".format(sample_name_out)
-        ),
-        "rt",
-    ) as log_file:
+    with open(log_path, "rt") as log_file:
         content = log_file.read()
 
-        reads, merged = (
-            re.findall("(\d+)  Pairs", content)[0],
-            re.findall("(\d+)  Merged", content)[0],
-        )
+        pairs_match = re.findall(r"(\d+)\s+Pairs", content)
+        merged_match = re.findall(r"(\d+)\s+Merged", content)
 
-    finished = "{}".format(datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"))
+        reads = pairs_match[0] if pairs_match else "0"
+        merged = merged_match[0] if merged_match else "0"
+
+    finished = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
     ## Give user output, if 0 reads are the output handle Zero division exception
     try:
